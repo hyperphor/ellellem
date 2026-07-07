@@ -28,6 +28,18 @@
 (defmethod -complete-stream :anthropic [req]
   (anthropic/complete-stream req))
 
+(defmulti -list-models identity)
+
+(defmethod -list-models :openai [_]
+  (openai/normalize-models (openai/list-models)))
+
+(defmethod -list-models :anthropic [_]
+  (anthropic/normalize-models (anthropic/list-models)))
+
+(defmethod -list-models :default [provider]
+  (throw (ex-info (str "Unknown provider: " provider)
+                  {:provider provider})))
+
 ;;; Public API
 
 (defn complete
@@ -54,6 +66,12 @@
   "Like complete but streams SSE events as a lazy seq."
   [req]
   (-complete-stream req))
+
+(defn list-models
+  "List available models for a provider (:openai or :anthropic).
+  Returns a vector of {:id :created :raw} (:name also present for :anthropic)."
+  [provider]
+  (-list-models provider))
 
 (defn query
   "Convenience: single-turn user query, returns text content string.

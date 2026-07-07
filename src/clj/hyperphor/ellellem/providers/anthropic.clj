@@ -17,6 +17,13 @@
    "anthropic-version" api-version
    "content-type" "application/json"})
 
+(defn api-get
+  [path params]
+  (:body (client/get (str base-url path)
+                     {:query-params params
+                      :headers (base-headers)
+                      :as :json})))
+
 (defn api-post
   [path body]
   (:body (client/post (str base-url path)
@@ -32,6 +39,15 @@
                        :content-type :application/json
                        :headers (base-headers)
                        :as :stream})))
+
+(defn list-models []
+  (api-get "/models" {}))
+
+(defn normalize-models
+  "Convert a raw Anthropic /models list response to a vector of normalized model maps."
+  [response]
+  (mapv (fn [m] {:id (:id m) :name (:display_name m) :created (:created_at m) :raw m})
+        (:data response)))
 
 ;;; Normalization
 

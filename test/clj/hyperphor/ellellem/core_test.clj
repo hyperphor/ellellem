@@ -109,6 +109,20 @@
     (is (= [{:id "toolu_01" :name "calculator" :arguments {:expression "2+2"}}]
            (:tool-calls normalized)))))
 
+(deftest test-openai-normalize-models
+  (let [raw {:data [{:id "gpt-4.1" :object "model" :created 1234 :owned_by "openai"}]}
+        normalized (openai/normalize-models raw)]
+    (is (= [{:id "gpt-4.1" :created 1234 :raw (first (:data raw))}]
+           normalized))))
+
+(deftest test-anthropic-normalize-models
+  (let [raw {:data [{:type "model" :id "claude-opus-4-8"
+                     :display_name "Claude Opus 4.8" :created_at "2026-01-01T00:00:00Z"}]}
+        normalized (anthropic/normalize-models raw)]
+    (is (= [{:id "claude-opus-4-8" :name "Claude Opus 4.8"
+             :created "2026-01-01T00:00:00Z" :raw (first (:data raw))}]
+           normalized))))
+
 (deftest test-tool-result-messages
   (let [results [{:id "call_1" :name "add" :result 7}
                  {:id "call_2" :name "mul" :result 12}]]
@@ -136,6 +150,10 @@
   (llm/query :openai "Say hello in one word")
 
   (llm/query :anthropic "Say hello in one word")
+
+  (llm/list-models :openai)
+
+  (llm/list-models :anthropic)
 
   (let [weather-tool (llm/make-tool
                       "get_weather"

@@ -42,6 +42,12 @@
 (defn list-models []
   (api-get "/models" {}))
 
+(defn normalize-models
+  "Convert a raw OpenAI /models list response to a vector of normalized model maps."
+  [response]
+  (mapv (fn [m] {:id (:id m) :created (:created m) :raw m})
+        (:data response)))
+
 ;;; Normalization
 
 (defn- normalize-tool-call
