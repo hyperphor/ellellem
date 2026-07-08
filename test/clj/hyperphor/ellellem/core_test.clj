@@ -97,6 +97,50 @@
     (is (= :stop (:stop-reason normalized)))
     (is (= 8 (get-in normalized [:usage :input-tokens])))))
 
+(deftest test-openai-normalize-refusal
+  (let [raw {:choices [{:message {:role "assistant"
+                                  :content nil
+                                  :refusal "I can't help with that."}
+                        :finish_reason "stop"}]
+             :usage {:prompt_tokens 10 :completion_tokens 5}}
+        normalized (openai/normalize-response raw)]
+    (is (nil? (:content normalized)))
+    (is (= "I can't help with that." (:refusal normalized)))
+    (is (= :refusal (:stop-reason normalized)))))
+
+(deftest test-anthropic-normalize-refusal-stop-reason
+  (testing "no explanatory text available"
+    (let [raw {:content []
+               :stop_reason "refusal"
+               :usage {:input_tokens 5 :output_tokens 0}}
+          normalized (anthropic/normalize-response raw)]
+      (is (= :refusal (:stop-reason normalized)))
+      (is (= "Claude declined to respond (no explanation provided)."
+             (:refusal normalized)))))
+  (testing "explanatory text present is surfaced as the refusal"
+    (let [raw {:content [{:type "text" :text "I can't help with that request."}]
+               :stop_reason "refusal"
+               :usage {:input_tokens 5 :output_tokens 3}}
+          normalized (anthropic/normalize-response raw)]
+      (is (= :refusal (:stop-reason normalized)))
+      (is (= "I can't help with that request." (:refusal normalized))))))
+
+(deftest test-ensure-content
+  (testing "returns content when present"
+    (is (= "hi" (#'llm/ensure-content {:content "hi" :stop-reason :stop}))))
+  (testing "throws an informative error on refusal"
+    (let [e (try (#'llm/ensure-content {:content nil :stop-reason :refusal
+                                        :refusal "I can't help with that."})
+                 (catch Exception e e))]
+      (is (some? e))
+      (is (re-find #"refusal" (ex-message e)))
+      (is (re-find #"I can't help with that\." (ex-message e)))))
+  (testing "throws an informative error when content is otherwise missing"
+    (let [e (try (#'llm/ensure-content {:content nil :stop-reason :length})
+                 (catch Exception e e))]
+      (is (some? e))
+      (is (re-find #"length" (ex-message e))))))
+
 (deftest test-anthropic-normalize-tool-call-response
   (let [raw {:content [{:type "tool_use"
                         :id "toolu_01"

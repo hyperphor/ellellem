@@ -66,17 +66,21 @@
     (keyword finish-reason)))
 
 (defn normalize-response
-  "Convert a raw OpenAI chat completions response to the ellellem normalized format."
+  "Convert a raw OpenAI chat completions response to the ellellem normalized format.
+  A model refusal (message.refusal set, e.g. under structured outputs) is surfaced
+  as :refusal with :stop-reason :refusal, since finish_reason alone doesn't signal it."
   [response]
   (let [choice (get-in response [:choices 0])
         message (:message choice)
+        refusal (:refusal message)
         finish-reason (normalize-stop-reason (:finish_reason choice))
         tool-calls (some->> (:tool_calls message)
                             (mapv normalize-tool-call)
                             not-empty)]
     {:content (:content message)
+     :refusal refusal
      :tool-calls tool-calls
-     :stop-reason finish-reason
+     :stop-reason (if refusal :refusal finish-reason)
      :usage {:input-tokens (get-in response [:usage :prompt_tokens])
              :output-tokens (get-in response [:usage :completion_tokens])}
      :raw response}))

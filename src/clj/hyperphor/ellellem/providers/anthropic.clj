@@ -68,6 +68,7 @@
     "tool_use" :tool-calls
     "max_tokens" :length
     "stop_sequence" :stop
+    "refusal" :refusal
     (keyword stop-reason)))
 
 (defn normalize-response
@@ -80,10 +81,16 @@
                   not-empty)
         tool-calls (->> content-blocks
                         (keep content-block->tool-call)
-                        not-empty)]
+                        not-empty)
+        stop-reason (normalize-stop-reason (:stop_reason response))]
     {:content text
+     :refusal (when (= stop-reason :refusal)
+                (or text
+                    (get-in response [:stop_details :explanation])
+                    "No explanation given"
+                    ))
      :tool-calls tool-calls
-     :stop-reason (normalize-stop-reason (:stop_reason response))
+     :stop-reason stop-reason
      :usage {:input-tokens (get-in response [:usage :input_tokens])
              :output-tokens (get-in response [:usage :output_tokens])}
      :raw response}))

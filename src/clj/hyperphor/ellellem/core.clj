@@ -73,9 +73,23 @@
   [provider]
   (-list-models provider))
 
+(defn- ensure-content
+  "Return the :content of a normalized response, or throw an informative error
+  if the provider returned none — e.g. a refusal (:stop-reason :refusal, with
+  :refusal text on OpenAI) or a content filter."
+  [response]
+  (or (:content response)
+      (throw (ex-info (str "LLM call returned no content (stop-reason: "
+                           (:stop-reason response)
+                           ")"
+                           (when (:refusal response)
+                             (str "Refusal: " (:refusal response))))
+                      {:response response}))))
+
 (defn query
   "Convenience: single-turn user query, returns text content string.
-  provider can be :openai or :anthropic."
+  provider can be :openai or :anthropic.
+  Throws if the provider returns no content (e.g. a refusal or content filter)."
   [provider text & {:keys [model system max-tokens tools]}]
   (-> (complete (cond-> {:provider provider
                          :messages [{:role :user :content text}]}
@@ -83,7 +97,7 @@
                   system (assoc :system system)
                   max-tokens (assoc :max-tokens max-tokens)
                   tools (assoc :tools tools)))
-      :content))
+      ensure-content))
 
 ;;; Agentic loop — run tool calls until :stop
 
@@ -175,7 +189,7 @@
                     model (assoc :model model)
                     system (assoc :system system)
                     max-tokens (assoc :max-tokens max-tokens)))
-        :content
+        ensure-content
         util/read-json-safe)
     :anthropic
     (let [schema-instruction (str "\nRespond with a single JSON object matching this schema:\n"
@@ -187,7 +201,7 @@
                              :system sys}
                       model (assoc :model model)
                       max-tokens (assoc :max-tokens max-tokens)))
-          :content
+          ensure-content
           util/extract-and-parse))))
 
 
